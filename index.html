@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stupp12 Patient Planner</title>
+  <style>
+    :root {
+      --bg: #f4efe5;
+      --card: rgba(255, 252, 247, 0.95);
+      --card-strong: #fffdf8;
+      --border: #dcc9ad;
+      --text: #2f2418;
+      --muted: #7c6954;
+      --heading: #452f1d;
+      --brand: #8b5e34;
+      --brand-dark: #65421f;
+      --brand-soft: #f0e2cf;
+      --chemo: #d8ebff;
+      --chemo-border: #8db6df;
+      --weekend: #f6efe4;
+      --success: #e5f1df;
+      --shadow: 0 18px 40px rgba(74, 47, 21, 0.12);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.7), transparent 35%),
+        linear-gradient(180deg, #f7f1e8 0%, var(--bg) 55%, #efe5d7 100%);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 32px auto 48px;
+    }
+
+    .hero {
+      margin-bottom: 24px;
+      padding: 32px;
+      border: 1px solid rgba(220, 201, 173, 0.8);
+      border-radius: calc(var(--radius-lg) + 4px);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.88), rgba(249, 240, 227, 0.95)),
+        linear-gradient(120deg, rgba(139, 94, 52, 0.08), transparent 45%);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      color: var(--heading);
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .card {
+      margin-bottom: 24px;
+      padding: 24px;
+      border: 1px solid rgba(220, 201, 173, 0.9);
+      border-radius: var(--radius-lg);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .card h2 {
+      margin: 0 0 18px;
+      color: var(--heading);
+      font-size: 1.45rem;
+    }
+
+    .setup-card {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250, 243, 233, 0.96)),
+        var(--card-strong);
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px 18px;
+      align-items: end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-wide { grid-column: 1 / -1; }
+
+    .field-split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .unit-toggle,
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toggle-chip {
+      width: auto;
+      min-width: 0;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.92);
+      color: var(--brand-dark);
+      box-shadow: none;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .toggle-chip.active {
+      background: linear-gradient(135deg, var(--brand) 0%, #a97746 100%);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 8px 18px rgba(101, 66, 31, 0.18);
+    }
+
+    .field[hidden],
+    .input-group[hidden],
+    .phase-card[hidden] { display: none; }
+
+    label {
+      color: var(--heading);
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    input, select, button { font: inherit; }
+
+    input, select {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.94);
+      color: var(--text);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--brand);
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px rgba(139, 94, 52, 0.14);
+      transform: translateY(-1px);
+    }
+
+    input::placeholder { color: #a3927e; }
+
+    .button-row {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      width: auto;
+      min-width: 180px;
+      padding: 14px 22px;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--brand) 0%, #a97746 100%);
+      color: white;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(101, 66, 31, 0.22);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(101, 66, 31, 0.28);
+      filter: saturate(1.05);
+    }
+
+    button:active { transform: translateY(0); }
+
+    .secondary-button {
+      background: rgba(255,255,255,0.96);
+      color: var(--brand-dark);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+
+    .secondary-button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
+      box-shadow: none;
+    }
+
+    .export-hint,
+    .status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status.error { color: #8a2c1b; }
+
+    .phase-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .info-stack {
+      display: grid;
+      gap: 16px;
+      position: sticky;
+      top: 20px;
+    }
+
+    .info-box {
+      padding: 18px;
+      border: 1px solid rgba(220, 201, 173, 0.9);
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, #fffdf9 0%, #f8f0e3 100%);
+    }
+
+    .info-box h3,
+    .cycle-box h3 {
+      margin: 0 0 10px;
+      color: var(--heading);
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #3d2d1e;
+    }
+
+    .calendar-shell { min-width: 0; }
+
+    .calendar-grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    .month-block {
+      overflow: hidden;
+      border: 1px solid rgba(220, 201, 173, 0.95);
+      border-radius: 20px;
+      background: #fffdfa;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+    }
+
+    .month-title {
+      margin: 0;
+      padding: 16px 18px;
+      background: linear-gradient(135deg, #f3e1ca 0%, #e7cfb1 100%);
+      color: var(--heading);
+      font-size: 1.08rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .month-cycle-panel {
+      margin: 14px 14px 0;
+      padding: 14px;
+      border: 1px solid rgba(220, 201, 173, 0.9);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fffdf9 0%, #f6ecde 100%);
+    }
+
+    .month-cycle-panel h4 {
+      margin: 0 0 10px;
+      color: var(--heading);
+      font-size: 0.9rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .cycle-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .cycle-item {
+      padding: 14px;
+      border: 1px solid #e5d5bf;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.82);
+    }
+
+    .cycle-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--heading);
+    }
+
+    .cycle-meta {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .cycle-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .cycle-actions button {
+      min-width: 0;
+      padding: 10px 14px;
+      font-size: 14px;
+      background: rgba(255,255,255,0.96);
+      color: var(--brand-dark);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+
+    .cycle-actions button.active {
+      background: linear-gradient(135deg, #c17f48 0%, #a7632d 100%);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 8px 18px rgba(167, 99, 45, 0.2);
+    }
+
+    .cycle-status {
+      margin: 8px 0 0;
+      color: var(--brand-dark);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      font-size: 14px;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #eadfce;
+      text-align: left;
+      padding: 10px;
+      height: 118px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #5b4028;
+      color: white;
+      text-align: center;
+      font-size: 0.9rem;
+      letter-spacing: 0.03em;
+    }
+
+    td {
+      position: relative;
+      background: #fffdfa;
+    }
+
+    td strong {
+      display: inline-block;
+      font-size: 1.05rem;
+      color: var(--heading);
+      margin-bottom: 6px;
+    }
+
+    .chemo {
+      background: linear-gradient(180deg, #eef6ff 0%, var(--chemo) 100%);
+      box-shadow: inset 0 0 0 1px var(--chemo-border);
+      font-weight: 700;
+    }
+
+    .weekend {
+      background: var(--weekend);
+      color: #7d6d5a;
+    }
+
+    .cycle-start {
+      box-shadow:
+        inset 0 0 0 2px rgba(139, 94, 52, 0.55),
+        inset 0 0 0 1px var(--chemo-border);
+    }
+
+    .adjusted-start {
+      background: linear-gradient(180deg, #f0f8eb 0%, var(--success) 100%);
+    }
+
+    .selectable-date {
+      cursor: pointer;
+      outline: 2px dashed rgba(139, 94, 52, 0.45);
+      outline-offset: -5px;
+    }
+
+    .selectable-date:hover {
+      background: #fef5e9;
+    }
+
+    .selection-note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .day-label {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(139, 94, 52, 0.11);
+      color: var(--brand-dark);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .day-event {
+      display: block;
+      margin-top: 8px;
+      color: #4c3a29;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 900px) {
+      .phase-grid { grid-template-columns: 1fr; }
+      .info-stack { position: static; }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100% - 20px, 1180px);
+        margin: 18px auto 28px;
+      }
+
+      .hero,
+      .card {
+        padding: 18px;
+        border-radius: 20px;
+      }
+
+      .input-grid,
+      .field-split {
+        grid-template-columns: 1fr;
+      }
+
+      button { width: 100%; }
+
+      th, td {
+        height: 104px;
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <div class="eyebrow">Treatment Planning</div>
+    <h1>Stupp12 Patient Planner</h1>
+    <p class="subtitle">A patient-facing chemotherapy calendar using the Stupp12 schedule and dose calculations.</p>
+  </section>
+
+  <section class="card setup-card">
+    <div class="input-grid">
+      <div class="field">
+        <label for="patientName">Name</label>
+        <input type="text" id="patientName" placeholder="Patient name">
+      </div>
+
+      <div class="field">
+        <label for="pwi">PWI / Diagnosis</label>
+        <input type="text" id="pwi" placeholder="e.g. Glioblastoma WHO Grade 4">
+      </div>
+
+      <div class="field">
+        <label for="age">Age</label>
+        <input type="number" id="age" min="0" step="1" placeholder="Age">
+      </div>
+
+      <div class="field">
+        <label for="sex">Sex</label>
+        <select id="sex">
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+        </select>
+      </div>
+
+      <div class="field field-wide">
+        <label class="checkbox-row">
+          <input type="checkbox" id="includeConcomitant" checked>
+          Include concomitant phase
+        </label>
+      </div>
+
+      <div class="field field-wide">
+        <label for="startDate" id="startDateLabel">Concomitant phase start date</label>
+        <input type="date" id="startDate">
+      </div>
+
+      <div class="field">
+        <label>Height</label>
+        <div class="unit-toggle">
+          <button type="button" class="toggle-chip active" id="heightMetricBtn" onclick="setHeightUnit('cm')">cm</button>
+          <button type="button" class="toggle-chip" id="heightImperialBtn" onclick="setHeightUnit('ftin')">ft / in</button>
+        </div>
+        <div class="input-group" id="heightMetricGroup">
+          <input type="number" id="height" min="0" step="0.1" placeholder="e.g. 165">
+        </div>
+        <div class="input-group field-split" id="heightImperialGroup" hidden>
+          <input type="number" id="heightFeet" min="0" step="1" placeholder="Feet">
+          <input type="number" id="heightInches" min="0" step="0.1" placeholder="Inches">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Weight</label>
+        <div class="unit-toggle">
+          <button type="button" class="toggle-chip active" id="weightMetricBtn" onclick="setWeightUnit('kg')">kg</button>
+          <button type="button" class="toggle-chip" id="weightImperialBtn" onclick="setWeightUnit('lbs')">lbs</button>
+        </div>
+        <div class="input-group" id="weightMetricGroup">
+          <input type="number" id="weight" min="0" step="0.1" placeholder="e.g. 60">
+        </div>
+        <div class="input-group" id="weightImperialGroup" hidden>
+          <input type="number" id="weightLbs" min="0" step="0.1" placeholder="e.g. 132">
+        </div>
+      </div>
+
+      <div class="field" id="rtTimeField">
+        <label for="rtTime">Radiation time</label>
+        <input type="time" id="rtTime">
+      </div>
+
+      <div class="field">
+        <label for="tmzTime">Adjuvant TMZ time</label>
+        <input type="time" id="tmzTime" value="22:00">
+      </div>
+
+      <div class="field">
+        <label for="adjustmentCycle">Latest dose adjustment cycle</label>
+        <select id="adjustmentCycle">
+          <option value="">None</option>
+          <option value="1">Cycle 1</option>
+          <option value="2">Cycle 2</option>
+          <option value="3">Cycle 3</option>
+          <option value="4">Cycle 4</option>
+          <option value="5">Cycle 5</option>
+          <option value="6">Cycle 6</option>
+          <option value="7">Cycle 7</option>
+          <option value="8">Cycle 8</option>
+          <option value="9">Cycle 9</option>
+          <option value="10">Cycle 10</option>
+          <option value="11">Cycle 11</option>
+          <option value="12">Cycle 12</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="adjustmentDate">Latest dose adjustment date started</label>
+        <input type="date" id="adjustmentDate">
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button type="button" onclick="generate()">Generate Planner</button>
+      <button type="button" id="downloadPrintableBtn" class="secondary-button" onclick="downloadPrintablePdf()" disabled>Download as PDF</button>
+      <button type="button" class="secondary-button" onclick="loadSample()">Load Sample</button>
+      <p class="export-hint">Opens a PDF-ready page with a manual download button.</p>
+      <p class="status" id="status"></p>
+    </div>
+  </section>
+
+  <section class="card phase-card" id="conSection">
+    <h2>Concomitant Phase</h2>
+    <div class="phase-grid">
+      <div class="info-stack">
+        <div class="info-box">
+          <h3>Dose Summary</h3>
+          <pre id="conDose"></pre>
+        </div>
+        <div class="info-box">
+          <h3>Timing Guide</h3>
+          <pre id="conTiming"></pre>
+        </div>
+      </div>
+      <div class="calendar-shell">
+        <div id="conCalendar"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Adjuvant Phase</h2>
+    <div class="phase-grid">
+      <div class="info-stack">
+        <div class="info-box">
+          <h3>Dose Summary</h3>
+          <pre id="adjDose"></pre>
+        </div>
+        <div class="info-box">
+          <h3>Timing Guide</h3>
+          <pre id="adjTiming"></pre>
+        </div>
+      </div>
+      <div class="calendar-shell">
+        <div id="adjCalendar"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ADJUVANT_CYCLES = 12;
+let heightUnit = "cm";
+let weightUnit = "kg";
+let plannerGenerated = false;
+let currentModel = null;
+let cycleAnswers = Array(ADJUVANT_CYCLES).fill(null);
+let cycleOverrides = Array(ADJUVANT_CYCLES).fill(null);
+let selectingCycleIndex = null;
+
+function parseNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function roundDoseToIncrement(exactDose, increment) {
+  return Math.max(Math.round(exactDose / increment) * increment, increment);
+}
+
+function capsuleCounts(dailyDoseMg) {
+  const count100 = Math.floor(dailyDoseMg / 100);
+  const remainder = dailyDoseMg - (count100 * 100);
+  return { 100: count100, 20: remainder / 20 };
+}
+
+function boxes(totalCapsules) {
+  return Math.ceil(totalCapsules / 5);
+}
+
+function normalizeDate(date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function addDays(date, days) {
+  const copy = normalizeDate(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function parseDateValue(value) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function parseTime(value) {
+  if (!value) return null;
+  const [hour, minute] = value.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function formatTime(date) {
+  if (!date) return "-";
+  let hour = date.getHours();
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  const ampm = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${ampm}`;
+}
+
+function formatDate(date) {
+  if (!date) return "-";
+  return normalizeDate(date).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function formatRange(start, end) {
+  return `${formatDate(start)} - ${formatDate(end)}`;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function buildSteps(items) {
+  return items
+    .filter(item => item.time)
+    .sort((a, b) => a.time - b.time)
+    .map(item => `${item.label}: ${formatTime(item.time)}`)
+    .join("\n");
+}
+
+function setStatus(message, isError = false) {
+  const statusElement = document.getElementById("status");
+  statusElement.textContent = message;
+  statusElement.classList.toggle("error", isError);
+}
+
+function setHeightUnit(unit) {
+  if (unit === "ftin" && heightUnit !== "ftin") {
+    const cm = parseFloat(height.value);
+    if (cm > 0) {
+      const totalInches = cm / 2.54;
+      heightFeet.value = Math.floor(totalInches / 12);
+      heightInches.value = Math.round((totalInches % 12) * 10) / 10;
+    }
+  }
+  if (unit === "cm" && heightUnit !== "cm") {
+    const cm = getHeightCm();
+    if (cm) height.value = Math.round(cm * 10) / 10;
+  }
+
+  heightUnit = unit;
+  heightMetricGroup.hidden = unit !== "cm";
+  heightImperialGroup.hidden = unit !== "ftin";
+  heightMetricBtn.classList.toggle("active", unit === "cm");
+  heightImperialBtn.classList.toggle("active", unit === "ftin");
+}
+
+function setWeightUnit(unit) {
+  if (unit === "lbs" && weightUnit !== "lbs") {
+    const kg = parseFloat(weight.value);
+    if (kg > 0) weightLbs.value = Math.round((kg * 2.20462) * 10) / 10;
+  }
+  if (unit === "kg" && weightUnit !== "kg") {
+    const kg = getWeightKg();
+    if (kg) weight.value = Math.round(kg * 10) / 10;
+  }
+
+  weightUnit = unit;
+  weightMetricGroup.hidden = unit !== "kg";
+  weightImperialGroup.hidden = unit !== "lbs";
+  weightMetricBtn.classList.toggle("active", unit === "kg");
+  weightImperialBtn.classList.toggle("active", unit === "lbs");
+}
+
+function getHeightCm() {
+  if (heightUnit === "cm") {
+    const cm = parseFloat(height.value);
+    return cm > 0 ? cm : null;
+  }
+  const feet = parseFloat(heightFeet.value);
+  const inches = parseFloat(heightInches.value);
+  if ((!feet && feet !== 0) && (!inches && inches !== 0)) return null;
+  const totalInches = (feet || 0) * 12 + (inches || 0);
+  return totalInches > 0 ? totalInches * 2.54 : null;
+}
+
+function getWeightKg() {
+  if (weightUnit === "kg") {
+    const kg = parseFloat(weight.value);
+    return kg > 0 ? kg : null;
+  }
+  const lbs = parseFloat(weightLbs.value);
+  return lbs > 0 ? lbs / 2.20462 : null;
+}
+
+function computeBsa(weightKg, heightCm) {
+  return 0.007184 * Math.pow(heightCm, 0.725) * Math.pow(weightKg, 0.425);
+}
+
+function phaseDose(bsa, doseMgPerM2, days) {
+  const patientDose = roundDoseToIncrement(bsa * doseMgPerM2, 20);
+  const perDay = capsuleCounts(patientDose);
+  return {
+    patientDose,
+    perDay,
+    totalCaps: {
+      100: perDay[100] * days,
+      20: perDay[20] * days
+    }
+  };
+}
+
+function resetCycleChecker() {
+  cycleAnswers = Array(ADJUVANT_CYCLES).fill(null);
+  cycleOverrides = Array(ADJUVANT_CYCLES).fill(null);
+  selectingCycleIndex = null;
+}
+
+function buildCycleSchedule(plannedStarts) {
+  const schedule = [];
+  let nextExpected = null;
+
+  for (let i = 0; i < ADJUVANT_CYCLES; i += 1) {
+    const expectedStart = normalizeDate(nextExpected || plannedStarts[i]);
+    let actualStart = expectedStart;
+
+    if (cycleAnswers[i] === false && cycleOverrides[i]) {
+      actualStart = normalizeDate(cycleOverrides[i]);
+    }
+
+    schedule.push({
+      index: i,
+      expectedStart,
+      actualStart,
+      startedOnTime: cycleAnswers[i]
+    });
+
+    if (nextExpected || (cycleAnswers[i] === false && cycleOverrides[i])) {
+      nextExpected = addDays(actualStart, 28);
+    }
+  }
+
+  return schedule;
+}
+
+function buildModel() {
+  const start = parseDateValue(startDate.value);
+  const heightCm = getHeightCm();
+  const weightKg = getWeightKg();
+  const includeCon = includeConcomitant.checked;
+  const adjustmentCycleValue = parseNumber(adjustmentCycle.value);
+  const adjustmentDateValue = parseDateValue(adjustmentDate.value);
+
+  if (!start || !heightCm || !weightKg) {
+    throw new Error("Fill the start date, height, and weight.");
+  }
+  if ((adjustmentCycleValue && !adjustmentDateValue) || (!adjustmentCycleValue && adjustmentDateValue)) {
+    throw new Error("Enter both latest dose adjustment cycle and date started, or leave both blank.");
+  }
+
+  const bsa = Math.round(computeBsa(weightKg, heightCm) * 100) / 100;
+  const concomitantEnd = includeCon ? addDays(start, 41) : null;
+  const cycle1Start = includeCon ? addDays(concomitantEnd, 28) : start;
+  const plannedAdjuvantStarts = Array.from({ length: ADJUVANT_CYCLES }, (_, index) => addDays(cycle1Start, index * 28));
+
+  if (adjustmentCycleValue && adjustmentDateValue) {
+    const cycleIndex = adjustmentCycleValue - 1;
+    for (let i = cycleIndex; i < plannedAdjuvantStarts.length; i += 1) {
+      plannedAdjuvantStarts[i] = addDays(adjustmentDateValue, (i - cycleIndex) * 28);
+    }
+  }
+
+  const cycleSchedule = buildCycleSchedule(plannedAdjuvantStarts);
+  const adjuvantStarts = cycleSchedule.map(cycle => cycle.actualStart);
+
+  const conPhase = includeCon ? phaseDose(bsa, 75, 42) : null;
+  const adj1Phase = phaseDose(bsa, 150, 5);
+  const adj2Phase = phaseDose(bsa, 200, (ADJUVANT_CYCLES - 1) * 5);
+
+  return {
+    name: patientName.value.trim() || "Unnamed patient",
+    pwi: pwi.value.trim(),
+    age: age.value.trim(),
+    sex: sex.value,
+    includeCon,
+    start,
+    concomitantEnd,
+    cycle1Start,
+    plannedAdjuvantStarts,
+    cycleSchedule,
+    adjuvantStarts,
+    adjustmentCycle: adjustmentCycleValue || null,
+    adjustmentDate: adjustmentDateValue,
+    bsa,
+    heightCm,
+    weightKg,
+    conPhase,
+    adj1Phase,
+    adj2Phase
+  };
+}
+
+function cycleInfoForDate(date, starts) {
+  const cellDate = normalizeDate(date);
+  for (let i = 0; i < starts.length; i += 1) {
+    const diff = Math.floor((cellDate - starts[i]) / 86400000);
+    if (diff >= 0 && diff < 28) {
+      return { cycle: i + 1, day: diff + 1, start: starts[i] };
+    }
+  }
+  return null;
+}
+
+function renderCycleControlItem(cycle) {
+  const item = document.createElement("div");
+  item.className = "cycle-item";
+  item.dataset.cycleIndex = String(cycle.index);
+
+  const title = document.createElement("strong");
+  title.textContent = `Cycle ${cycle.index + 1}`;
+  item.appendChild(title);
+
+  const meta = document.createElement("p");
+  let details = `Planned start: ${formatDate(cycle.expectedStart)}`;
+  if (cycle.startedOnTime === false && cycleOverrides[cycle.index]) {
+    details += `\nStarted: ${formatDate(cycle.actualStart)}`;
+  }
+  meta.className = "cycle-meta";
+  meta.textContent = details;
+  item.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "cycle-actions";
+
+  const yesButton = document.createElement("button");
+  yesButton.type = "button";
+  yesButton.textContent = "Yes";
+  yesButton.dataset.cycleAction = "yes";
+  yesButton.className = cycle.startedOnTime === true ? "active" : "";
+  yesButton.onclick = () => markCycleOnTime(cycle.index, true);
+  actions.appendChild(yesButton);
+
+  const noButton = document.createElement("button");
+  noButton.type = "button";
+  noButton.textContent = "No";
+  noButton.dataset.cycleAction = "no";
+  noButton.className = cycle.startedOnTime === false ? "active" : "";
+  noButton.onclick = () => markCycleOnTime(cycle.index, false);
+  actions.appendChild(noButton);
+
+  item.appendChild(actions);
+
+  const cycleStatus = document.createElement("p");
+  cycleStatus.className = "cycle-status";
+  if (cycle.startedOnTime === true) {
+    cycleStatus.textContent = "Did you start the cycle on time? Yes";
+  } else if (cycle.startedOnTime === false && cycleOverrides[cycle.index]) {
+    cycleStatus.textContent = `Did you start the cycle on time? No. Adjusted start: ${formatDate(cycle.actualStart)}`;
+  } else if (cycle.startedOnTime === false) {
+    cycleStatus.textContent = "Did you start the cycle on time? No. Click a calendar day to choose the actual start date.";
+  } else {
+    cycleStatus.textContent = "Did you start the cycle on time?";
+  }
+  item.appendChild(cycleStatus);
+
+  return item;
+}
+
+function buildMonthCyclePanel(monthDate, model) {
+  const month = monthDate.getMonth();
+  const year = monthDate.getFullYear();
+  const cycles = model.cycleSchedule.filter(cycle => {
+    const anchor = cycle.startedOnTime === false && cycleOverrides[cycle.index]
+      ? cycle.actualStart
+      : cycle.expectedStart;
+    return anchor.getMonth() === month && anchor.getFullYear() === year;
+  });
+
+  if (!cycles.length) return null;
+
+  const panel = document.createElement("div");
+  panel.className = "month-cycle-panel";
+
+  const heading = document.createElement("h4");
+  heading.textContent = "Cycle Start Check";
+  panel.appendChild(heading);
+
+  const list = document.createElement("div");
+  list.className = "cycle-list";
+  cycles.forEach(cycle => list.appendChild(renderCycleControlItem(cycle)));
+  panel.appendChild(list);
+
+  if (selectingCycleIndex !== null) {
+    const activeCycle = model.cycleSchedule[selectingCycleIndex];
+    if (activeCycle) {
+      const anchor = activeCycle.expectedStart;
+      if (anchor.getMonth() === month && anchor.getFullYear() === year) {
+        const note = document.createElement("p");
+        note.className = "selection-note";
+        note.textContent = `Selecting a new start date for Cycle ${selectingCycleIndex + 1}. Click a calendar day on or after ${formatDate(anchor)}.`;
+        panel.appendChild(note);
+      }
+    }
+  }
+
+  return panel;
+}
+
+function refreshAdjuvantPlan() {
+  if (!currentModel) return;
+  try {
+    currentModel = buildModel();
+    renderDoseSummary(currentModel);
+    adjCalendar.innerHTML = "";
+    const finalCycleStart = currentModel.adjuvantStarts[currentModel.adjuvantStarts.length - 1];
+    const totalAdjDays = Math.ceil((addDays(finalCycleStart, 28) - currentModel.adjuvantStarts[0]) / 86400000);
+    adjCalendar.appendChild(generateCalendar(currentModel.adjuvantStarts[0], totalAdjDays, "adj", currentModel));
+    plannerGenerated = true;
+    downloadPrintableBtn.disabled = false;
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function markCycleOnTime(index, startedOnTime) {
+  cycleAnswers[index] = startedOnTime;
+  if (startedOnTime) {
+    cycleOverrides[index] = null;
+    if (selectingCycleIndex === index) selectingCycleIndex = null;
+  } else {
+    cycleOverrides[index] = null;
+    selectingCycleIndex = index;
+  }
+  refreshAdjuvantPlan();
+}
+
+function selectCycleStart(index, date) {
+  const model = buildModel();
+  const cycle = model.cycleSchedule[index];
+  const picked = normalizeDate(date);
+  if (!cycle || picked < cycle.expectedStart) return;
+
+  cycleAnswers[index] = false;
+  cycleOverrides[index] = picked;
+  selectingCycleIndex = null;
+  refreshAdjuvantPlan();
+}
+
+function generateCalendar(start, totalDays, type, model) {
+  const container = document.createElement("div");
+  container.className = "calendar-grid";
+  let current = normalizeDate(start);
+  const end = addDays(start, totalDays);
+
+  while (current < end) {
+    const month = current.getMonth();
+    const title = document.createElement("div");
+    title.className = "month-title";
+    title.innerText = current.toLocaleString("default", { month: "long", year: "numeric" });
+
+    const monthBlock = document.createElement("section");
+    monthBlock.className = "month-block";
+    monthBlock.appendChild(title);
+
+    if (type === "adj") {
+      const panel = buildMonthCyclePanel(current, model);
+      if (panel) monthBlock.appendChild(panel);
+    }
+
+    const tableWrap = document.createElement("div");
+    tableWrap.className = "table-wrap";
+    const table = document.createElement("table");
+    table.innerHTML = "<tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>";
+
+    let row = document.createElement("tr");
+    for (let i = 0; i < current.getDay(); i += 1) row.innerHTML += "<td></td>";
+
+    while (current.getMonth() === month && current < end) {
+      const dayOfWeek = current.getDay();
+      const cell = document.createElement("td");
+      const cellDate = normalizeDate(current);
+      let html = `<strong>${current.getDate()}</strong>`;
+
+      if (dayOfWeek === 0 || dayOfWeek === 6) cell.classList.add("weekend");
+
+      if (type === "con") {
+        const diff = Math.floor((cellDate - model.start) / 86400000);
+        if (diff >= 0 && diff < 42) {
+          cell.classList.add("chemo");
+          html += `<br><span class="day-label">Day ${diff + 1}</span>`;
+          html += dayOfWeek !== 0 && dayOfWeek !== 6
+            ? `<span class="day-event">RT + TMZ</span>`
+            : `<span class="day-event">TMZ only</span>`;
+        }
+      }
+
+      if (type === "adj") {
+        const info = cycleInfoForDate(cellDate, model.adjuvantStarts);
+        if (info) {
+          html += `<br><span class="day-label">C${info.cycle} D${info.day}</span>`;
+          if (info.day <= 5) cell.classList.add("chemo");
+          if (info.day === 1) {
+            cell.classList.add("cycle-start");
+            if (model.adjustmentCycle && info.cycle >= model.adjustmentCycle) cell.classList.add("adjusted-start");
+            html += `<span class="day-event">Cycle start</span>`;
+          }
+          html += info.day <= 5
+            ? `<span class="day-event">TMZ</span>`
+            : `<span class="day-event">Off</span>`;
+        }
+
+        if (selectingCycleIndex !== null) {
+          const activeCycle = model.cycleSchedule[selectingCycleIndex];
+          if (activeCycle && cellDate >= activeCycle.expectedStart) {
+            cell.classList.add("selectable-date");
+            cell.onclick = () => selectCycleStart(selectingCycleIndex, cellDate);
+            if (!info) {
+              html += `<span class="day-event">Click to set Cycle ${selectingCycleIndex + 1} start</span>`;
+            }
+          }
+        }
+      }
+
+      cell.innerHTML = html;
+      row.appendChild(cell);
+
+      if (dayOfWeek === 6) {
+        table.appendChild(row);
+        row = document.createElement("tr");
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    table.appendChild(row);
+    tableWrap.appendChild(table);
+    monthBlock.appendChild(tableWrap);
+    container.appendChild(monthBlock);
+  }
+
+  return container;
+}
+
+function renderDoseSummary(model) {
+  if (model.includeCon) {
+    const rt = parseTime(rtTime.value);
+    const tmz = rt ? new Date(rt.getTime() - 3600000) : null;
+    const ond = tmz ? new Date(tmz.getTime() - 1800000) : null;
+    const meal = tmz ? new Date(tmz.getTime() - 10800000) : null;
+    const eat = tmz ? new Date(tmz.getTime() + 7200000) : null;
+    const con = model.conPhase;
+
+    conDose.innerText = `BSA: ${model.bsa.toFixed(2)} m^2
+
+Height: ${model.heightCm.toFixed(1)} cm
+Weight: ${model.weightKg.toFixed(1)} kg
+
+Dose: ${con.patientDose} mg (${con.perDay[100]}x100mg + ${con.perDay[20]}x20mg)
+Dates: ${formatRange(model.start, model.concomitantEnd)}
+
+TOTAL:
+100mg: ${con.totalCaps[100]} caps (${boxes(con.totalCaps[100])} boxes)
+20mg: ${con.totalCaps[20]} caps (${boxes(con.totalCaps[20])} boxes)`;
+
+    conTiming.innerText = buildSteps([
+      { label: "Last meal", time: meal },
+      { label: "Ondansetron (1 tab)", time: ond },
+      { label: "Temozolomide", time: tmz },
+      { label: "Radiation", time: rt },
+      { label: "May eat again (2 hrs after TMZ)", time: eat }
+    ]);
+  }
+
+  const d1 = model.adj1Phase;
+  const d2 = model.adj2Phase;
+  const perCycleD2Caps100 = d2.perDay[100] * 5;
+  const perCycleD2Caps20 = d2.perDay[20] * 5;
+
+  adjDose.innerText = `BSA: ${model.bsa.toFixed(2)} m^2
+
+Cycle 1 starts: ${formatDate(model.adjuvantStarts[0])}
+Cycle 1 dose: ${d1.patientDose} mg (${d1.perDay[100]}x100mg + ${d1.perDay[20]}x20mg)
+Per cycle:
+100mg: ${d1.totalCaps[100]} caps (${boxes(d1.totalCaps[100])} boxes)
+20mg: ${d1.totalCaps[20]} caps (${boxes(d1.totalCaps[20])} boxes)
+
+Cycles 2-12 dose: ${d2.patientDose} mg (${d2.perDay[100]}x100mg + ${d2.perDay[20]}x20mg)
+Per cycle:
+100mg: ${perCycleD2Caps100} caps (${boxes(perCycleD2Caps100)} boxes)
+20mg: ${perCycleD2Caps20} caps (${boxes(perCycleD2Caps20)} boxes)
+
+TOTAL (12 cycles):
+100mg: ${d1.totalCaps[100] + d2.totalCaps[100]} caps (${boxes(d1.totalCaps[100] + d2.totalCaps[100])} boxes)
+20mg: ${d1.totalCaps[20] + d2.totalCaps[20]} caps (${boxes(d1.totalCaps[20] + d2.totalCaps[20])} boxes)`;
+
+  const tmzA = parseTime(tmzTime.value);
+  const ondA = tmzA ? new Date(tmzA.getTime() - 1800000) : null;
+  const mealA = tmzA ? new Date(tmzA.getTime() - 10800000) : null;
+  const eatA = tmzA ? new Date(tmzA.getTime() + 7200000) : null;
+
+  adjTiming.innerText = buildSteps([
+    { label: "Last meal", time: mealA },
+    { label: "Ondansetron (2 tabs)", time: ondA },
+    { label: "Temozolomide", time: tmzA },
+    { label: "May eat again (2 hrs after TMZ)", time: eatA }
+  ]);
+}
+
+function generate() {
+  try {
+    const model = buildModel();
+    currentModel = model;
+    conSection.hidden = !model.includeCon;
+    rtTimeField.hidden = !model.includeCon;
+    conCalendar.innerHTML = "";
+    adjCalendar.innerHTML = "";
+    renderDoseSummary(model);
+
+    if (model.includeCon) {
+      conCalendar.appendChild(generateCalendar(model.start, 42, "con", model));
+    }
+
+    const finalCycleStart = model.adjuvantStarts[model.adjuvantStarts.length - 1];
+    const totalAdjDays = Math.ceil((addDays(finalCycleStart, 28) - model.adjuvantStarts[0]) / 86400000);
+    adjCalendar.appendChild(generateCalendar(model.adjuvantStarts[0], totalAdjDays, "adj", model));
+
+    plannerGenerated = true;
+    downloadPrintableBtn.disabled = false;
+    setStatus(`Planner generated for ${model.name}.`);
+  } catch (error) {
+    plannerGenerated = false;
+    downloadPrintableBtn.disabled = true;
+    setStatus(error.message, true);
+  }
+}
+
+function syncFormValues(sourceRoot, cloneRoot) {
+  const sourceFields = sourceRoot.querySelectorAll("input, textarea, select");
+  const cloneFields = cloneRoot.querySelectorAll("input, textarea, select");
+
+  sourceFields.forEach((field, index) => {
+    const cloneField = cloneFields[index];
+    if (!cloneField) return;
+    if (field.type === "checkbox" || field.type === "radio") {
+      cloneField.checked = field.checked;
+      if (field.checked) cloneField.setAttribute("checked", "checked");
+      else cloneField.removeAttribute("checked");
+    } else {
+      cloneField.value = field.value;
+      cloneField.setAttribute("value", field.value);
+    }
+  });
+}
+
+function buildPrintablePageClone() {
+  const source = document.querySelector(".page");
+  const clone = source.cloneNode(true);
+  syncFormValues(source, clone);
+  clone.querySelectorAll("button").forEach(button => button.remove());
+  clone.querySelectorAll(".export-hint, .status").forEach(item => item.remove());
+  clone.querySelectorAll("input, select").forEach(input => {
+    input.disabled = true;
+    input.style.pointerEvents = "none";
+  });
+  return clone.outerHTML;
+}
+
+function buildPrintablePdfDocument() {
+  const styleTag = document.querySelector("style");
+  const styleContent = styleTag ? styleTag.textContent : "";
+  const printedAt = new Date().toLocaleString();
+  const pageHtml = buildPrintablePageClone();
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Stupp12 Planner PDF</title>
+  <style>${styleContent}</style>
+  <style>
+    body { background: white !important; }
+    .page {
+      width: 1180px !important;
+      margin: 0 auto !important;
+      transform-origin: top center;
+    }
+    .button-row { display: none !important; }
+    .info-stack { position: static !important; }
+    .export-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      background: rgba(255,255,255,0.96);
+      border-bottom: 1px solid #dcc9ad;
+      backdrop-filter: blur(10px);
+      font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
+    }
+    .export-print-stamp {
+      color: #7c6954;
+      font-size: 13px;
+    }
+    .export-download-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #8b5e34 0%, #a97746 100%);
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(101, 66, 31, 0.22);
+    }
+    .export-page { padding-top: 18px; }
+    @media print {
+      body {
+        zoom: 0.82;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .export-toolbar { display: none !important; }
+      .export-page { padding-top: 0; }
+    }
+    @page {
+      size: auto;
+      margin: 10mm;
+    }
+  </style>
+</head>
+<body>
+  <div class="export-toolbar">
+    <div class="export-print-stamp">Printable version generated ${escapeHtml(printedAt)}</div>
+    <button class="export-download-btn" onclick="window.print()">Download as PDF</button>
+  </div>
+  <div class="export-page">${pageHtml}</div>
+</body>
+</html>`;
+}
+
+function downloadPrintablePdf() {
+  if (!plannerGenerated) {
+    alert("Generate the planner first.");
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow pop-ups to open the printable PDF view.");
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(buildPrintablePdfDocument());
+  printWindow.document.close();
+}
+
+function syncConcomitantOption() {
+  startDateLabel.textContent = includeConcomitant.checked
+    ? "Concomitant phase start date"
+    : "Adjuvant cycle 1 start date";
+  rtTimeField.hidden = !includeConcomitant.checked;
+  conSection.hidden = !includeConcomitant.checked;
+}
+
+function todayInputValue() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function loadSample() {
+  resetCycleChecker();
+  patientName.value = "Umendal, Bernardo Ramos";
+  pwi.value = "Glioblastoma WHO Grade 4";
+  age.value = "46";
+  sex.value = "M";
+  includeConcomitant.checked = true;
+  startDate.value = todayInputValue();
+  height.value = "169";
+  weight.value = "81";
+  rtTime.value = "09:00";
+  tmzTime.value = "22:00";
+  adjustmentCycle.value = "";
+  adjustmentDate.value = "";
+  setHeightUnit("cm");
+  setWeightUnit("kg");
+  syncConcomitantOption();
+}
+
+includeConcomitant.addEventListener("change", () => {
+  resetCycleChecker();
+  syncConcomitantOption();
+  plannerGenerated = false;
+  downloadPrintableBtn.disabled = true;
+});
+
+document.querySelectorAll("input, select").forEach(input => {
+  input.addEventListener("input", () => {
+    resetCycleChecker();
+    plannerGenerated = false;
+    downloadPrintableBtn.disabled = true;
+    setStatus("");
+  });
+});
+
+loadSample();
+</script>
+</body>
+</html>
