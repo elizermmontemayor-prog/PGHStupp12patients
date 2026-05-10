@@ -515,7 +515,7 @@
   <section class="hero">
     <div class="eyebrow">Treatment Planning</div>
     <h1>Stupp12 Patient Planner</h1>
-    <p class="subtitle">A patient-facing chemotherapy calendar using the Stupp12 schedule and dose calculations.</p>
+    <p class="subtitle">Personalized guide to chemotherapy.</p>
   </section>
 
   <section class="card setup-card">
@@ -523,11 +523,6 @@
       <div class="field">
         <label for="patientName">Name</label>
         <input type="text" id="patientName" placeholder="Patient name">
-      </div>
-
-      <div class="field">
-        <label for="pwi">PWI / Diagnosis</label>
-        <input type="text" id="pwi" placeholder="e.g. Glioblastoma WHO Grade 4">
       </div>
 
       <div class="field">
@@ -594,36 +589,12 @@
         <input type="time" id="tmzTime" value="22:00">
       </div>
 
-      <div class="field">
-        <label for="adjustmentCycle">Latest dose adjustment cycle</label>
-        <select id="adjustmentCycle">
-          <option value="">None</option>
-          <option value="1">Cycle 1</option>
-          <option value="2">Cycle 2</option>
-          <option value="3">Cycle 3</option>
-          <option value="4">Cycle 4</option>
-          <option value="5">Cycle 5</option>
-          <option value="6">Cycle 6</option>
-          <option value="7">Cycle 7</option>
-          <option value="8">Cycle 8</option>
-          <option value="9">Cycle 9</option>
-          <option value="10">Cycle 10</option>
-          <option value="11">Cycle 11</option>
-          <option value="12">Cycle 12</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="adjustmentDate">Latest dose adjustment date started</label>
-        <input type="date" id="adjustmentDate">
-      </div>
     </div>
 
     <div class="button-row">
       <button type="button" onclick="generate()">Generate Planner</button>
       <button type="button" id="downloadPrintableBtn" class="secondary-button" onclick="downloadPrintablePdf()" disabled>Download as PDF</button>
-      <button type="button" class="secondary-button" onclick="loadSample()">Load Sample</button>
-      <p class="export-hint">Opens a PDF-ready page with a manual download button.</p>
+      <p class="export-hint">Downloads the current planner as a PDF.</p>
       <p class="status" id="status"></p>
     </div>
   </section>
@@ -667,6 +638,8 @@
   </section>
 </div>
 
+<script src="./pdf-lib.min.js"></script>
+<script src="./html2canvas.min.js"></script>
 <script>
 const ADJUVANT_CYCLES = 12;
 let heightUnit = "cm";
@@ -879,27 +852,15 @@ function buildModel() {
   const heightCm = getHeightCm();
   const weightKg = getWeightKg();
   const includeCon = includeConcomitant.checked;
-  const adjustmentCycleValue = parseNumber(adjustmentCycle.value);
-  const adjustmentDateValue = parseDateValue(adjustmentDate.value);
 
   if (!start || !heightCm || !weightKg) {
     throw new Error("Fill the start date, height, and weight.");
-  }
-  if ((adjustmentCycleValue && !adjustmentDateValue) || (!adjustmentCycleValue && adjustmentDateValue)) {
-    throw new Error("Enter both latest dose adjustment cycle and date started, or leave both blank.");
   }
 
   const bsa = Math.round(computeBsa(weightKg, heightCm) * 100) / 100;
   const concomitantEnd = includeCon ? addDays(start, 41) : null;
   const cycle1Start = includeCon ? addDays(concomitantEnd, 28) : start;
   const plannedAdjuvantStarts = Array.from({ length: ADJUVANT_CYCLES }, (_, index) => addDays(cycle1Start, index * 28));
-
-  if (adjustmentCycleValue && adjustmentDateValue) {
-    const cycleIndex = adjustmentCycleValue - 1;
-    for (let i = cycleIndex; i < plannedAdjuvantStarts.length; i += 1) {
-      plannedAdjuvantStarts[i] = addDays(adjustmentDateValue, (i - cycleIndex) * 28);
-    }
-  }
 
   const cycleSchedule = buildCycleSchedule(plannedAdjuvantStarts);
   const adjuvantStarts = cycleSchedule.map(cycle => cycle.actualStart);
@@ -910,7 +871,6 @@ function buildModel() {
 
   return {
     name: patientName.value.trim() || "Unnamed patient",
-    pwi: pwi.value.trim(),
     age: age.value.trim(),
     sex: sex.value,
     includeCon,
@@ -920,8 +880,6 @@ function buildModel() {
     plannedAdjuvantStarts,
     cycleSchedule,
     adjuvantStarts,
-    adjustmentCycle: adjustmentCycleValue || null,
-    adjustmentDate: adjustmentDateValue,
     bsa,
     heightCm,
     weightKg,
@@ -1132,7 +1090,7 @@ function generateCalendar(start, totalDays, type, model) {
           if (info.day <= 5) cell.classList.add("chemo");
           if (info.day === 1) {
             cell.classList.add("cycle-start");
-            if (model.adjustmentCycle && info.cycle >= model.adjustmentCycle) cell.classList.add("adjusted-start");
+            if (model.cycleSchedule[info.cycle - 1]?.startedOnTime === false) cell.classList.add("adjusted-start");
             html += `<span class="day-event">Cycle start</span>`;
           }
           html += info.day <= 5
@@ -1264,9 +1222,211 @@ function generate() {
   }
 }
 
-function syncFormValues(sourceRoot, cloneRoot) {
-  const sourceFields = sourceRoot.querySelectorAll("input, textarea, select");
-  const cloneFields = cloneRoot.querySelectorAll("input, textarea, select");
+function safeFileName(value) {
+  return String(value || "patient")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase() || "patient";
+}
+
+function downloadBlob(bytes, fileName, mimeType) {
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function parseCssColor(value) {
+  if (!value || value === "transparent" || value === "rgba(0, 0, 0, 0)") return null;
+  return value;
+}
+
+function drawRoundedRect(context, x, y, width, height, radius) {
+  const safeRadius = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
+}
+
+function canvasFont(style) {
+  const weight = style.fontWeight || "400";
+  const size = style.fontSize || "16px";
+  const family = style.fontFamily || "Arial, sans-serif";
+  return `${weight} ${size} ${family}`;
+}
+
+function drawTextLine(context, text, x, y, style) {
+  const color = parseCssColor(style.color);
+  if (!color || !text.trim()) return;
+  context.font = canvasFont(style);
+  context.fillStyle = color;
+  context.textBaseline = "top";
+  context.fillText(text, x, y);
+}
+
+function drawMultilineText(context, text, rect, style, offsetX, offsetY) {
+  const lines = String(text).split("\n");
+  const fontSize = parseFloat(style.fontSize) || 14;
+  const lineHeight = parseFloat(style.lineHeight) || fontSize * 1.6;
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const paddingTop = parseFloat(style.paddingTop) || 0;
+  const maxWidth = Math.max(20, rect.width - paddingLeft - paddingRight);
+  let y = rect.top - offsetY + paddingTop;
+  lines.forEach((line) => {
+    if (!line.trim()) {
+      y += lineHeight;
+      return;
+    }
+
+    context.font = canvasFont(style);
+    const words = line.split(/\s+/);
+    let wrappedLine = "";
+    words.forEach((word) => {
+      const next = wrappedLine ? `${wrappedLine} ${word}` : word;
+      if (context.measureText(next).width > maxWidth && wrappedLine) {
+        drawTextLine(context, wrappedLine, rect.left - offsetX + paddingLeft, y, style);
+        y += lineHeight;
+        wrappedLine = word;
+      } else {
+        wrappedLine = next;
+      }
+    });
+    if (wrappedLine) {
+      drawTextLine(context, wrappedLine, rect.left - offsetX + paddingLeft, y, style);
+      y += lineHeight;
+    }
+  });
+}
+
+function drawWrappedTextContent(context, text, rect, style, offsetX, offsetY) {
+  const fontSize = parseFloat(style.fontSize) || 14;
+  const lineHeight = parseFloat(style.lineHeight) || fontSize * 1.35;
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const paddingTop = parseFloat(style.paddingTop) || 0;
+  const maxWidth = Math.max(20, rect.width - paddingLeft - paddingRight);
+  const words = String(text).trim().replace(/\s+/g, " ").split(" ");
+  let line = "";
+  let y = rect.top - offsetY + paddingTop;
+
+  context.font = canvasFont(style);
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (context.measureText(next).width > maxWidth && line) {
+      drawTextLine(context, line, rect.left - offsetX + paddingLeft, y, style);
+      y += lineHeight;
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) drawTextLine(context, line, rect.left - offsetX + paddingLeft, y, style);
+}
+
+function drawTextNodes(context, element, offsetX, offsetY) {
+  const directTextParents = new Set(["DIV", "P", "LABEL", "BUTTON", "H1", "H2", "H3", "H4", "STRONG", "SPAN", "TH", "TD", "PRE"]);
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      const tag = parent.tagName;
+      if (["SCRIPT", "STYLE", "OPTION", "TEXTAREA"].includes(tag)) return NodeFilter.FILTER_REJECT;
+      if (parent.closest(".info-box")) return NodeFilter.FILTER_REJECT;
+      if (!directTextParents.has(tag)) return NodeFilter.FILTER_REJECT;
+      if (parent.children.length && !["LABEL", "BUTTON"].includes(tag)) return NodeFilter.FILTER_REJECT;
+      const style = getComputedStyle(parent);
+      if (style.display === "none" || style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const range = document.createRange();
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const parent = node.parentElement;
+    const style = getComputedStyle(parent);
+
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects());
+    const text = node.textContent.trim().replace(/\s+/g, " ");
+    if (!rects.length || !text) continue;
+    if (rects.length > 1) {
+      drawWrappedTextContent(context, text, parent.getBoundingClientRect(), style, offsetX, offsetY);
+    } else {
+      drawTextLine(context, text, rects[0].left - offsetX, rects[0].top - offsetY, style);
+    }
+  }
+  range.detach();
+}
+
+function drawElementBox(context, element, offsetX, offsetY) {
+  const style = getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return;
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const x = rect.left - offsetX;
+  const y = rect.top - offsetY;
+  const radius = parseFloat(style.borderRadius) || 0;
+  let bg = parseCssColor(style.backgroundColor);
+  const borderColor = parseCssColor(style.borderTopColor);
+  const borderWidth = parseFloat(style.borderTopWidth) || 0;
+
+  if (!bg && style.backgroundImage && style.backgroundImage !== "none") {
+    if (element.classList.contains("info-box") || element.classList.contains("cycle-box")) bg = "#fffdf9";
+    else if (element.classList.contains("card") || element.classList.contains("hero")) bg = "#fffdf7";
+    else if (element.classList.contains("month-title")) bg = "#ead3b5";
+    else if (element.classList.contains("month-cycle-panel")) bg = "#fffaf1";
+    else if (element.classList.contains("cycle-item")) bg = "#fffdf9";
+    else if (element.classList.contains("chemo")) bg = "#d8ebff";
+  }
+
+  if (bg) {
+    drawRoundedRect(context, x, y, rect.width, rect.height, radius);
+    context.fillStyle = bg;
+    context.fill();
+  }
+
+  if (borderColor && borderWidth > 0) {
+    drawRoundedRect(context, x + borderWidth / 2, y + borderWidth / 2, rect.width - borderWidth, rect.height - borderWidth, radius);
+    context.strokeStyle = borderColor;
+    context.lineWidth = borderWidth;
+    context.stroke();
+  }
+}
+
+function drawFormValue(context, element, offsetX, offsetY) {
+  const style = getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  const value = element.tagName === "SELECT"
+    ? element.options[element.selectedIndex]?.text || ""
+    : element.value || "";
+  if (!value) return;
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const fontSize = parseFloat(style.fontSize) || 16;
+  const y = rect.top - offsetY + ((rect.height - fontSize) / 2) - 1;
+  drawTextLine(context, value, rect.left - offsetX + paddingLeft, y, style);
+}
+
+function syncExportFormValues(sourceRoot, cloneRoot) {
+  const sourceFields = sourceRoot.querySelectorAll("input, select, textarea");
+  const cloneFields = cloneRoot.querySelectorAll("input, select, textarea");
 
   sourceFields.forEach((field, index) => {
     const cloneField = cloneFields[index];
@@ -1275,117 +1435,190 @@ function syncFormValues(sourceRoot, cloneRoot) {
       cloneField.checked = field.checked;
       if (field.checked) cloneField.setAttribute("checked", "checked");
       else cloneField.removeAttribute("checked");
-    } else {
-      cloneField.value = field.value;
-      cloneField.setAttribute("value", field.value);
+      return;
+    }
+    cloneField.value = field.value;
+    cloneField.setAttribute("value", field.value);
+    if (cloneField.tagName === "SELECT") {
+      Array.from(cloneField.options).forEach((option) => {
+        option.selected = option.value === field.value;
+        if (option.selected) option.setAttribute("selected", "selected");
+        else option.removeAttribute("selected");
+      });
     }
   });
 }
 
-function buildPrintablePageClone() {
-  const source = document.querySelector(".page");
-  const clone = source.cloneNode(true);
-  syncFormValues(source, clone);
-  clone.querySelectorAll("button").forEach(button => button.remove());
-  clone.querySelectorAll(".export-hint, .status").forEach(item => item.remove());
-  clone.querySelectorAll("input, select").forEach(input => {
-    input.disabled = true;
-    input.style.pointerEvents = "none";
+function replacePreBlocksForExport(pageElement) {
+  pageElement.querySelectorAll(".info-box pre").forEach((pre) => {
+    const replacement = document.createElement("div");
+    replacement.className = "export-pre";
+    replacement.dataset.exportText = pre.textContent;
+    replacement.style.margin = "0";
+    replacement.style.whiteSpace = "normal";
+    replacement.style.fontFamily = '"SFMono-Regular", "Menlo", "Consolas", monospace';
+    replacement.style.fontSize = "13px";
+    replacement.style.lineHeight = "1.6";
+    replacement.style.color = "#3d2d1e";
+
+    pre.textContent.split("\n").forEach((line) => {
+      const lineElement = document.createElement("div");
+      lineElement.textContent = line || "\u00a0";
+      lineElement.style.minHeight = "20.8px";
+      replacement.appendChild(lineElement);
+    });
+
+    pre.replaceWith(replacement);
   });
-  return clone.outerHTML;
 }
 
-function buildPrintablePdfDocument() {
-  const styleTag = document.querySelector("style");
-  const styleContent = styleTag ? styleTag.textContent : "";
-  const printedAt = new Date().toLocaleString();
-  const pageHtml = buildPrintablePageClone();
+function drawExportInfoBoxes(context, pageElement, offsetX, offsetY) {
+  pageElement.querySelectorAll(".info-box").forEach((box) => {
+    const boxRect = box.getBoundingClientRect();
+    const x = boxRect.left - offsetX;
+    const y = boxRect.top - offsetY;
+    const radius = 16;
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Stupp12 Planner PDF</title>
-  <style>${styleContent}</style>
-  <style>
-    body { background: white !important; }
-    .page {
-      width: 1180px !important;
-      margin: 0 auto !important;
-      transform-origin: top center;
+    drawRoundedRect(context, x, y, boxRect.width, boxRect.height, radius);
+    context.fillStyle = "#fffdf9";
+    context.fill();
+    context.strokeStyle = "#dcc9ad";
+    context.lineWidth = 1;
+    context.stroke();
+
+    const heading = box.querySelector("h3");
+    if (heading) {
+      const headingStyle = getComputedStyle(heading);
+      const headingRect = heading.getBoundingClientRect();
+      drawTextLine(context, heading.textContent, headingRect.left - offsetX, headingRect.top - offsetY, headingStyle);
     }
-    .button-row { display: none !important; }
-    .info-stack { position: static !important; }
-    .export-toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      padding: 14px 18px;
-      background: rgba(255,255,255,0.96);
-      border-bottom: 1px solid #dcc9ad;
-      backdrop-filter: blur(10px);
-      font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
-    }
-    .export-print-stamp {
-      color: #7c6954;
-      font-size: 13px;
-    }
-    .export-download-btn {
-      border: none;
-      border-radius: 999px;
-      padding: 12px 18px;
-      background: linear-gradient(135deg, #8b5e34 0%, #a97746 100%);
-      color: white;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 12px 26px rgba(101, 66, 31, 0.22);
-    }
-    .export-page { padding-top: 18px; }
-    @media print {
-      body {
-        zoom: 0.82;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .export-toolbar { display: none !important; }
-      .export-page { padding-top: 0; }
-    }
-    @page {
-      size: auto;
-      margin: 10mm;
-    }
-  </style>
-</head>
-<body>
-  <div class="export-toolbar">
-    <div class="export-print-stamp">Printable version generated ${escapeHtml(printedAt)}</div>
-    <button class="export-download-btn" onclick="window.print()">Download as PDF</button>
-  </div>
-  <div class="export-page">${pageHtml}</div>
-</body>
-</html>`;
+
+    const textBlock = box.querySelector(".export-pre");
+    if (!textBlock) return;
+    const blockRect = textBlock.getBoundingClientRect();
+    const blockStyle = getComputedStyle(textBlock);
+    const exportStyle = {
+      color: blockStyle.color,
+      fontFamily: blockStyle.fontFamily,
+      fontWeight: blockStyle.fontWeight,
+      fontSize: blockStyle.fontSize,
+      lineHeight: blockStyle.lineHeight,
+      paddingLeft: "0",
+      paddingRight: "0",
+      paddingTop: "0",
+    };
+    drawMultilineText(context, textBlock.dataset.exportText || textBlock.textContent, blockRect, exportStyle, offsetX, offsetY);
+  });
 }
 
-function downloadPrintablePdf() {
+async function renderPagePicture() {
+  if (typeof html2canvas !== "function") {
+    throw new Error("The screenshot renderer is missing.");
+  }
+
+  const sourcePage = document.querySelector(".page");
+  const holder = document.createElement("div");
+  const pageElement = sourcePage.cloneNode(true);
+  syncExportFormValues(sourcePage, pageElement);
+  holder.style.cssText = "position:absolute;left:-20000px;top:0;width:1180px;background:white;z-index:-1;";
+  pageElement.style.width = "1180px";
+  pageElement.style.margin = "0";
+  pageElement.querySelectorAll(".button-row").forEach((row) => row.remove());
+  pageElement.querySelectorAll(".phase-grid").forEach((grid) => {
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "minmax(260px, 330px) minmax(0, 1fr)";
+    grid.style.gap = "22px";
+    grid.style.alignItems = "start";
+  });
+  pageElement.querySelectorAll(".input-grid").forEach((grid) => {
+    grid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  });
+  pageElement.querySelectorAll(".calendar-shell").forEach((shell) => {
+    shell.style.minWidth = "0";
+  });
+  pageElement.querySelectorAll(".table-wrap").forEach((wrap) => {
+    wrap.style.overflow = "visible";
+  });
+  pageElement.querySelectorAll("table").forEach((table) => {
+    table.style.width = "100%";
+    table.style.minWidth = "720px";
+  });
+  pageElement.querySelectorAll(".info-stack").forEach((stack) => {
+    stack.style.position = "static";
+  });
+  pageElement.querySelectorAll(".info-box").forEach((box) => {
+    box.style.minHeight = "auto";
+  });
+  pageElement.querySelectorAll("pre").forEach((pre) => {
+    pre.style.fontSize = "13px";
+    pre.style.lineHeight = "1.6";
+    pre.style.whiteSpace = "pre-wrap";
+    pre.style.overflowWrap = "break-word";
+  });
+  holder.appendChild(pageElement);
+  document.body.appendChild(holder);
+
+  try {
+    const width = Math.ceil(Math.max(pageElement.scrollWidth, 1180));
+    const height = Math.ceil(pageElement.scrollHeight + 24);
+    const canvas = await html2canvas(pageElement, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      width,
+      height,
+      windowWidth: 1180,
+      scrollX: 0,
+      scrollY: 0,
+      useCORS: true,
+    });
+    return canvas.toDataURL("image/png");
+  } finally {
+    holder.remove();
+  }
+}
+
+async function buildPlannerPdfBytes() {
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.create();
+  const pagePicture = await renderPagePicture();
+  const pageImage = await pdfDoc.embedPng(pagePicture);
+  const pageWidth = 841.89;
+  const pageHeight = 595.28;
+  const margin = 12;
+  const contentWidth = pageWidth - (margin * 2);
+  const contentHeight = pageHeight - (margin * 2);
+  const imageScale = contentWidth / pageImage.width;
+  const imageHeight = pageImage.height * imageScale;
+  const pageCount = Math.max(1, Math.ceil(imageHeight / contentHeight));
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+    page.drawImage(pageImage, {
+      x: margin,
+      y: pageHeight - margin - imageHeight + (pageIndex * contentHeight),
+      width: contentWidth,
+      height: imageHeight,
+    });
+  }
+
+  return pdfDoc.save();
+}
+
+async function downloadPrintablePdf() {
   if (!plannerGenerated) {
     alert("Generate the planner first.");
     return;
   }
 
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow pop-ups to open the printable PDF view.");
-    return;
+  try {
+    setStatus("Preparing PDF download...");
+    currentModel = buildModel();
+    const pdfBytes = await buildPlannerPdfBytes();
+    downloadBlob(pdfBytes, `${safeFileName(currentModel?.name)}_stupp12_planner.pdf`, "application/pdf");
+    setStatus("PDF downloaded.");
+  } catch (error) {
+    setStatus(error.message, true);
   }
-
-  printWindow.document.open();
-  printWindow.document.write(buildPrintablePdfDocument());
-  printWindow.document.close();
 }
 
 function syncConcomitantOption() {
@@ -1403,8 +1636,7 @@ function todayInputValue() {
 
 function loadSample() {
   resetCycleChecker();
-  patientName.value = "Umendal, Bernardo Ramos";
-  pwi.value = "Glioblastoma WHO Grade 4";
+  patientName.value = "Juan Dela Cruz";
   age.value = "46";
   sex.value = "M";
   includeConcomitant.checked = true;
@@ -1413,8 +1645,6 @@ function loadSample() {
   weight.value = "81";
   rtTime.value = "09:00";
   tmzTime.value = "22:00";
-  adjustmentCycle.value = "";
-  adjustmentDate.value = "";
   setHeightUnit("cm");
   setWeightUnit("kg");
   syncConcomitantOption();
